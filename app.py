@@ -6,29 +6,38 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
 
+# ---------------------------------
+# PAGE CONFIG
+# ---------------------------------
+
 st.set_page_config(
-    page_title="YouTube NLP Assistant",
+    page_title="YouTube NLP Learning Assistant",
     page_icon="🎥",
     layout="wide"
 )
 
 st.title("🎥 YouTube NLP Learning Assistant")
 
-st.write(
-    "Ask questions from the CampusX NLP Playlist"
-)
+st.markdown("""
+Ask questions from the CampusX NLP Playlist using
+Retrieval-Augmented Generation (RAG).
 
-# -----------------------------
-# GROQ
-# -----------------------------
+**Tech Stack:** LangChain • FAISS • Sentence Transformers • Groq • Streamlit
+""")
+
+
+# ---------------------------------
+# GROQ CLIENT
+# ---------------------------------
 
 client = Groq(
     api_key=st.secrets["GROQ_API_KEY"]
 )
 
-# -----------------------------
-# EMBEDDINGS
-# -----------------------------
+
+# ---------------------------------
+# LOAD FAISS
+# ---------------------------------
 
 @st.cache_resource
 def load_vectorstore():
@@ -38,18 +47,20 @@ def load_vectorstore():
     )
 
     db = FAISS.load_local(
-        "faiss_index",
+        ".",   # current directory
         embeddings,
         allow_dangerous_deserialization=True
     )
 
     return db
 
+
 vectorstore = load_vectorstore()
 
-# -----------------------------
+
+# ---------------------------------
 # RAG FUNCTION
-# -----------------------------
+# ---------------------------------
 
 def ask_rag(question):
 
@@ -63,14 +74,14 @@ def ask_rag(question):
     )
 
     prompt = f"""
-You are an NLP tutor.
+You are an expert NLP tutor.
 
-Answer only using the provided context.
+Answer ONLY from the provided context.
 
-If the answer is not found,
-say:
+If the answer is not available in the context,
+reply with:
 
-I could not find this information in the playlist.
+"I could not find this information in the playlist."
 
 Context:
 {context}
@@ -78,15 +89,18 @@ Context:
 Question:
 {question}
 
-Answer:
+Provide:
+1. Explanation
+2. Example
+3. Key Takeaway
 """
 
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
             {
-                "role":"user",
-                "content":prompt
+                "role": "user",
+                "content": prompt
             }
         ]
     )
@@ -94,16 +108,49 @@ Answer:
     return response.choices[0].message.content
 
 
+# ---------------------------------
+# UI
+# ---------------------------------
+
 question = st.text_input(
-    "Ask a Question"
+    "Ask a Question",
+    placeholder="Example: What is Tokenization?"
 )
 
 if st.button("Get Answer"):
 
-    with st.spinner("Thinking..."):
+    if question.strip() == "":
+        st.warning("Please enter a question.")
 
-        answer = ask_rag(question)
+    else:
 
-    st.subheader("Answer")
+        with st.spinner("Searching playlist and generating answer..."):
 
-    st.write(answer)
+            answer = ask_rag(question)
+
+        st.subheader("Answer")
+
+        st.write(answer)
+
+
+# ---------------------------------
+# SIDEBAR
+# ---------------------------------
+
+with st.sidebar:
+
+    st.header("Project Info")
+
+    st.markdown("""
+This assistant is built using:
+
+- LangChain
+- FAISS Vector Database
+- Sentence Transformers
+- Groq Llama 3
+- Streamlit
+
+Knowledge Source:
+
+CampusX NLP Playlist
+""")
